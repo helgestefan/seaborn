@@ -459,7 +459,7 @@ class Plot:
         )
 
         # --- Figure initialization
-        figure_kws = {"figsize": getattr(self, "_figsize", None)}  # TODO
+        figure_kws = {"figsize": getattr(self, "_figsize", None)}  # TODO fix this hack
         self._figure = subplots.init_figure(pyplot, figure_kws)
 
         # --- Assignment of scales
@@ -491,8 +491,8 @@ class Plot:
                 ax.set(**{
                     # TODO Should we make it possible to use only one x/y label for
                     # all rows/columns in a faceted plot? Maybe using sub{axis}label,
-                    # although the alignments of the labels from taht method leaves
-                    # something to be desired.
+                    # although the alignments of the labels from that method leaves
+                    # something to be desired (in terms of how it defines 'centered').
                     f"{axis}label": setup_data.names.get(axis_key)
                 })
 
@@ -794,7 +794,11 @@ class Plot:
 
     def _repr_png_(self) -> bytes:
 
-        # TODO better to do this through a Jupyter hook?
+        # TODO better to do this through a Jupyter hook? e.g.
+        # ipy = IPython.core.formatters.get_ipython()
+        # fmt = ipy.display_formatter.formatters["text/html"]
+        # fmt.for_type(Plot, ...)
+
         # TODO Would like to allow for svg too ... how to configure?
 
         # TODO perhaps have self.show() flip a switch to disable this, so that

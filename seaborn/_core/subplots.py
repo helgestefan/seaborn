@@ -162,6 +162,7 @@ class Subplots:
         # Get i, j coordinates for each Axes object
         # Note that i, j are with respect to faceting/pairing,
         # not the subplot grid itself, (which only matters in the case of wrapping).
+        iter_axs: np.ndenumerate | zip
         if not self.pair_spec.get("cartesian", True):
             indices = np.arange(self.n_subplots)
             iter_axs = zip(zip(indices, indices), axs.flat)
