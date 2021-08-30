@@ -8,7 +8,9 @@ from distutils.version import LooseVersion
 
 import pandas as pd
 import matplotlib as mpl
-import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure, SubFigure
+import matplotlib.pyplot as plt  # TODO defer import into Plot.show()
 
 from seaborn._core.rules import categorical_order, variable_type
 from seaborn._core.data import PlotData
@@ -26,8 +28,6 @@ if TYPE_CHECKING:
     from typing import Literal, Any
     from collections.abc import Callable, Generator, Iterable, Hashable
     from pandas import DataFrame, Series, Index
-    from matplotlib.figure import Figure
-    from matplotlib.axes import Axes
     from matplotlib.scale import ScaleBase
     from matplotlib.colors import Normalize
     from seaborn._core.mappings import SemanticMapping
@@ -75,11 +75,13 @@ class Plot:
             "y": ScaleWrapper(mpl.scale.LinearScale("y"), "unknown"),
         }
 
+        self._target_obj = None
+
         self._subplotspec = {}
         self._facetspec = {}
         self._pairspec = {}
 
-    def on(self) -> Plot:
+    def on(self, obj: Axes | SubFigure | Figure) -> Plot:
 
         # TODO  Provisional name for a method that accepts an existing Axes object,
         # and possibly one that does all of the figure/subplot configuration
@@ -91,7 +93,15 @@ class Plot:
         # larger figure. Not sure what to do about that. I suppose existing figure could
         # disabling legend_out.
 
-        raise NotImplementedError()
+        if not isinstance(obj, (Axes, SubFigure, Figure)):
+            err = (
+                f"`obj` must be an instance of {Axes}, {SubFigure}, or {Figure}. "
+                f"Got an object of class {obj.__class__} instead."
+            )
+            raise TypeError(err)
+
+        self._target_obj = obj
+
         return self
 
     def add(
@@ -377,7 +387,7 @@ class Plot:
             self._plot_layer(layer, layer_mappings)
 
         # TODO this should be configurable
-        self._figure.tight_layout()
+        # self._figure.tight_layout()
 
         return self
 
@@ -391,7 +401,10 @@ class Plot:
 
         # Keep an eye on whether matplotlib implements "attaching" an existing
         # figure to pyplot: https://github.com/matplotlib/matplotlib/pull/14024
-        self.clone().plot(pyplot=True)
+        if self._target_obj is None:
+            self.clone().plot(pyplot=True)
+        else:
+            self.plot(pyplot=True)
         plt.show(**kwargs)
 
     def save(self) -> Plot:  # TODO perhaps this should not return self?
@@ -459,8 +472,18 @@ class Plot:
         )
 
         # --- Figure initialization
-        figure_kws = {"figsize": getattr(self, "_figsize", None)}  # TODO fix this hack
-        self._figure = subplots.init_figure(pyplot, figure_kws)
+        if isinstance(self._target_obj, Axes):
+            if self._facetspec or self._pairspec:
+                err = (
+                    "Cannot create multiple subplots after calling `Plot.on` with a "
+                    f"{Axes} object. You may want to provide a {SubFigure} instead."
+                )
+                raise RuntimeError(err)
+            self._figure = subplots.init_from_axes(self._target_obj)
+
+        else:
+            figure_kws = {"figsize": getattr(self, "_figsize", None)}  # TODO fix
+            self._figure = subplots.init_figure(pyplot, self._target_obj, figure_kws)
 
         # --- Assignment of scales
         for sub in subplots:
@@ -809,6 +832,8 @@ class Plot:
         # But we can still show a Plot where the user has manually invoked .plot()
         if hasattr(self, "_figure"):
             figure = self._figure
+        elif self._target_obj is not None:
+            figure = self.plot()._figure
         else:
             figure = self.clone().plot()._figure
 

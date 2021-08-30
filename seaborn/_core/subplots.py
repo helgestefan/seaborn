@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import matplotlib as mpl
+from matplotlib.figure import Figure, SubFigure
 import matplotlib.pyplot as plt
 
 from seaborn._core.rules import categorical_order
@@ -9,7 +10,7 @@ from seaborn._core.rules import categorical_order
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Generator
-    from matplotlib.figure import Figure
+    from matplotlib.axes import Axes
     from seaborn._core.data import PlotData
 
 
@@ -134,19 +135,51 @@ class Subplots:
                     val = True
                 self.subplot_spec[key] = val
 
-    def init_figure(self, pyplot: bool, figure_kws: dict | None = None) -> Figure:
+    def init_from_axes(self, axes: Axes) -> Figure:
+
+        self._subplot_list = [{
+            "ax": axes,
+            "left": True,
+            "right": True,
+            "top": True,
+            "bottom": True,
+            "col": None,
+            "row": None,
+            "x": "x",
+            "y": "y",
+        }]
+        return axes.figure
+
+    def init_figure(
+        self,
+        pyplot: bool,
+        figure_obj: Figure | SubFigure = None,
+        figure_kws: dict | None = None,
+    ) -> Figure:
         """Initialize matplotlib objects and add seaborn-relevant metadata."""
         # TODO other methods don't have defaults, maybe don't have one here either
         if figure_kws is None:
             figure_kws = {}
 
-        if pyplot:
-            figure = plt.figure(**figure_kws)
+        # TODO we need a clearer distinction between "figure" and "figure_obj"
+        # (The first is the top of the mpl artist hierarchy we want to track,
+        #  while the second is the object that directly own the subplots.)
+        if isinstance(figure_obj, Figure):
+            figure = figure_obj
+        elif isinstance(figure_obj, SubFigure):
+            figure = figure_obj.figure
         else:
-            figure = mpl.figure.Figure(**figure_kws)
+            if pyplot:
+                figure = plt.figure(**figure_kws)
+            else:
+                figure = mpl.figure.Figure(**figure_kws)
+            figure_obj = figure
         self._figure = figure
 
-        axs = figure.subplots(**self.subplot_spec, squeeze=False)
+        # TODO check that figure does not currently have .axes?
+        assert not figure_obj.axes
+
+        axs = figure_obj.subplots(**self.subplot_spec, squeeze=False)
 
         if self.wrap:
             # Remove unused Axes and flatten the rest into a (2D) vector
