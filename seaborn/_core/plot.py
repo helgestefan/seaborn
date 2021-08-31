@@ -8,8 +8,6 @@ from distutils.version import LooseVersion
 
 import pandas as pd
 import matplotlib as mpl
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure, SubFigure
 import matplotlib.pyplot as plt  # TODO defer import into Plot.show()
 
 from seaborn._core.rules import categorical_order, variable_type
@@ -28,6 +26,8 @@ if TYPE_CHECKING:
     from typing import Literal, Any
     from collections.abc import Callable, Generator, Iterable, Hashable
     from pandas import DataFrame, Series, Index
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure, SubFigure
     from matplotlib.scale import ScaleBase
     from matplotlib.colors import Normalize
     from seaborn._core.mappings import SemanticMapping
@@ -85,11 +85,15 @@ class Plot:
 
         accepted_types: tuple  # Allow tuple of various length
         if hasattr(mpl.figure, "SubFigure"):  # Added in mpl 3.4
-            accepted_types = Axes, SubFigure, Figure
-            accepted_types_str = f"{Axes}, {SubFigure}, or {Figure}"
+            accepted_types = (
+                mpl.axes.Axes, mpl.figure.SubFigure, mpl.figure.Figure
+            )
+            accepted_types_str = (
+                f"{mpl.axes.Axes}, {mpl.figure.SubFigure}, or {mpl.figure.Figure}"
+            )
         else:
-            accepted_types = Axes, Figure
-            accepted_types_str = f"{Axes} or {Figure}"
+            accepted_types = mpl.axes.Axes, mpl.figure.Figure
+            accepted_types_str = f"{mpl.axes.Axes} or {mpl.figure.Figure}"
         if not isinstance(target, accepted_types):
             err = (
                 f"The `Plot.on` target must be an instance of {accepted_types_str}. "
