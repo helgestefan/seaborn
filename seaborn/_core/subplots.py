@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 import matplotlib as mpl
-from matplotlib.figure import Figure, SubFigure
 import matplotlib.pyplot as plt
 
 from seaborn._core.rules import categorical_order
@@ -11,6 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Generator
     from matplotlib.axes import Axes
+    from matplotlib.figure import Figure, SubFigure
     from seaborn._core.data import PlotData
 
 
@@ -135,51 +135,62 @@ class Subplots:
                     val = True
                 self.subplot_spec[key] = val
 
-    def init_from_axes(self, axes: Axes) -> Figure:
-
-        self._subplot_list = [{
-            "ax": axes,
-            "left": True,
-            "right": True,
-            "top": True,
-            "bottom": True,
-            "col": None,
-            "row": None,
-            "x": "x",
-            "y": "y",
-        }]
-        return axes.figure
-
     def init_figure(
         self,
-        pyplot: bool,
-        figure_obj: Figure | SubFigure = None,
+        pyplot: bool = False,
         figure_kws: dict | None = None,
+        target: Axes | Figure | SubFigure = None,
     ) -> Figure:
         """Initialize matplotlib objects and add seaborn-relevant metadata."""
-        # TODO other methods don't have defaults, maybe don't have one here either
         if figure_kws is None:
             figure_kws = {}
 
-        # TODO we need a clearer distinction between "figure" and "figure_obj"
-        # (The first is the top of the mpl artist hierarchy we want to track,
-        #  while the second is the object that directly own the subplots.)
-        if isinstance(figure_obj, Figure):
-            figure = figure_obj
-        elif isinstance(figure_obj, SubFigure):
-            figure = figure_obj.figure
+        if isinstance(target, mpl.axes.Axes):
+
+            if max(self.subplot_spec["nrows"], self.subplot_spec["ncols"]) > 1:
+                err = " ".join([
+                    "Cannot create multiple subplots after calling `Plot.on` with",
+                    f"a {mpl.axes.Axes} object.",
+                ])
+                try:
+                    err += f" You may want to use a {mpl.figure.SubFigure} instead."
+                except AttributeError:  # SubFigure added in mpl 3.4
+                    pass
+                raise RuntimeError(err)
+
+            self._subplot_list = [{
+                "ax": target,
+                "left": True,
+                "right": True,
+                "top": True,
+                "bottom": True,
+                "col": None,
+                "row": None,
+                "x": "x",
+                "y": "y",
+            }]
+            self._figure = target.figure
+            return self._figure
+
+        elif (
+            hasattr(mpl.figure, "SubFigure")  # Added in mpl 3.4
+            and isinstance(target, mpl.figure.SubFigure)
+        ):
+            figure = target.figure
+        elif isinstance(target, mpl.figure.Figure):
+            figure = target
         else:
             if pyplot:
                 figure = plt.figure(**figure_kws)
             else:
                 figure = mpl.figure.Figure(**figure_kws)
-            figure_obj = figure
+            target = figure
         self._figure = figure
 
         # TODO check that figure does not currently have .axes?
-        assert not figure_obj.axes
+        assert not target.axes
 
-        axs = figure_obj.subplots(**self.subplot_spec, squeeze=False)
+        axs = target.subplots(**self.subplot_spec, squeeze=False)
 
         if self.wrap:
             # Remove unused Axes and flatten the rest into a (2D) vector

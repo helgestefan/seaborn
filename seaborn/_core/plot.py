@@ -75,32 +75,29 @@ class Plot:
             "y": ScaleWrapper(mpl.scale.LinearScale("y"), "unknown"),
         }
 
-        self._target_obj = None
+        self._target = None
 
         self._subplotspec = {}
         self._facetspec = {}
         self._pairspec = {}
 
-    def on(self, obj: Axes | SubFigure | Figure) -> Plot:
+    def on(self, target: Axes | SubFigure | Figure) -> Plot:
 
-        # TODO  Provisional name for a method that accepts an existing Axes object,
-        # and possibly one that does all of the figure/subplot configuration
-
-        # We should also accept an existing figure object. This will be most useful
-        # in cases where users have created a *sub*figure ... it will let them facet
-        # etc. within an existing, larger figure. We still have the issue with putting
-        # the legend outside of the plot and that potentially causing problems for that
-        # larger figure. Not sure what to do about that. I suppose existing figure could
-        # disabling legend_out.
-
-        if not isinstance(obj, (Axes, SubFigure, Figure)):
+        accepted_types: tuple  # Allow tuple of various length
+        if hasattr(mpl.figure, "SubFigure"):  # Added in mpl 3.4
+            accepted_types = Axes, SubFigure, Figure
+            accepted_types_str = f"{Axes}, {SubFigure}, or {Figure}"
+        else:
+            accepted_types = Axes, Figure
+            accepted_types_str = f"{Axes} or {Figure}"
+        if not isinstance(target, accepted_types):
             err = (
-                f"`obj` must be an instance of {Axes}, {SubFigure}, or {Figure}. "
-                f"Got an object of class {obj.__class__} instead."
+                f"The `Plot.on` target must be an instance of {accepted_types_str}. "
+                f"You passed an object of class {target.__class__} instead."
             )
             raise TypeError(err)
 
-        self._target_obj = obj
+        self._target = target
 
         return self
 
@@ -394,14 +391,16 @@ class Plot:
     def clone(self) -> Plot:
 
         if hasattr(self, "_figure"):
-            raise RuntimeError("Cannot clone object after calling Plot.plot")
+            raise RuntimeError("Cannot clone after calling `Plot.plot`.")
+        elif self._target is not None:
+            raise RuntimeError("Cannot clone after calling `Plot.on`.")
         return deepcopy(self)
 
     def show(self, **kwargs) -> None:
 
         # Keep an eye on whether matplotlib implements "attaching" an existing
         # figure to pyplot: https://github.com/matplotlib/matplotlib/pull/14024
-        if self._target_obj is None:
+        if self._target is None:
             self.clone().plot(pyplot=True)
         else:
             self.plot(pyplot=True)
@@ -472,18 +471,8 @@ class Plot:
         )
 
         # --- Figure initialization
-        if isinstance(self._target_obj, Axes):
-            if self._facetspec or self._pairspec:
-                err = (
-                    "Cannot create multiple subplots after calling `Plot.on` with a "
-                    f"{Axes} object. You may want to provide a {SubFigure} instead."
-                )
-                raise RuntimeError(err)
-            self._figure = subplots.init_from_axes(self._target_obj)
-
-        else:
-            figure_kws = {"figsize": getattr(self, "_figsize", None)}  # TODO fix
-            self._figure = subplots.init_figure(pyplot, self._target_obj, figure_kws)
+        figure_kws = {"figsize": getattr(self, "_figsize", None)}  # TODO fix
+        self._figure = subplots.init_figure(pyplot, figure_kws, self._target)
 
         # --- Assignment of scales
         for sub in subplots:
@@ -832,10 +821,10 @@ class Plot:
         # But we can still show a Plot where the user has manually invoked .plot()
         if hasattr(self, "_figure"):
             figure = self._figure
-        elif self._target_obj is not None:
-            figure = self.plot()._figure
-        else:
+        elif self._target is None:
             figure = self.clone().plot()._figure
+        else:
+            figure = self.plot()._figure
 
         buffer = io.BytesIO()
 
