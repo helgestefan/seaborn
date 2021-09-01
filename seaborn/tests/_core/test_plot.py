@@ -694,6 +694,9 @@ class TestPlotting:
         assert m.passed_axes == f.axes
         assert p._figure is f
 
+    @pytest.mark.skipif(
+        LooseVersion(mpl.__version__) < "3.4", reason="mpl<3.4 does not have SubFigure",
+    )
     @pytest.mark.parametrize("facet", [True, False])
     def test_on_subfigure(self, facet):
 
@@ -706,6 +709,24 @@ class TestPlotting:
         p = p.plot()
         assert m.passed_axes == sf2.figure.axes[1:]
         assert p._figure is sf2.figure
+
+    def test_on_type_check(self):
+
+        p = Plot()
+        with pytest.raises(TypeError, match="The `Plot.on`.+<class 'list'>"):
+            p.on([])
+
+    def test_on_axes_with_subplots_error(self):
+
+        ax = mpl.figure.Figure().subplots()
+
+        p1 = Plot().facet(["a", "b"]).on(ax)
+        with pytest.raises(RuntimeError, match="Cannot create multiple subplots"):
+            p1.plot()
+
+        p2 = Plot().pair([["a", "b"], ["x", "y"]]).on(ax)
+        with pytest.raises(RuntimeError, match="Cannot create multiple subplots"):
+            p2.plot()
 
 
 class TestFacetInterface:
