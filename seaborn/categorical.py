@@ -1442,6 +1442,10 @@ class _CategoricalStatPlotter(_CategoricalPlotter):
                         estimate = estimator(stat_data)
                         sd = np.std(stat_data)
                         confint.append((estimate - sd, estimate + sd))
+                        
+                    elif ci == "minmax":
+                        
+                        confint.append((max(stat_data), min(stat_data))
 
                     else:
 
