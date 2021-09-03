@@ -527,6 +527,8 @@ def _validate_errorbar_arg(arg):
 
     if arg is None:
         return None, None
+    elif arg == "minmax":
+        return "pi", 100
     elif callable(arg):
         return arg, None
     elif isinstance(arg, str):
